@@ -4,7 +4,8 @@
     "builder": "NIXPACKS",
     "nixpacksPlan": {
       "env": {
-        "PYTHON_VERSION": "3.11"
+        "PYTHON_VERSION": "3.11",
+        "INSTALL_PIP_DEPS": "requirements.txt"
       }
     }
   },

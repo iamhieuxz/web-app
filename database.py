@@ -27,9 +27,9 @@ def _resolve_default_base() -> str:
     env_override = os.environ.get("GALLERY_DL_HOME")
     if env_override:
         return os.path.normpath(env_override)
-    # Kiem tra E:\gallery-dl hoac E:\ co ton tai
-    if os.path.exists("E:/gallery-dl") or os.path.exists("E:/"):
-        return os.path.normpath("E:/gallery-dl")
+    # Railway: dùng /data nếu tồn tại
+    if os.path.exists("/data"):
+        return "/data/gallery-dl"
     return os.path.join(os.path.expanduser("~"), "gallery-dl")
 
 

@@ -219,7 +219,7 @@ utils.cleanup_temp_cookies()
 database.init_db()
 logger.info("🔐 Auth token (8 ký tự đầu): %s...", auth.AUTH_TOKEN[:8])
 
-saved_root = database.get_setting("download_folder", r"E:\gallery-dl")
+saved_root = database.get_setting("download_folder", "/data/downloads")
 
 COOKIE_DIR = os.path.abspath("data/cookies")
 os.makedirs(COOKIE_DIR, exist_ok=True)
@@ -701,7 +701,6 @@ def api_delete_db_account(req: AccountActionRequest, request: Request):
 # ==========================================
 # 16. API STORAGE
 # ==========================================
-_STORAGE_MAX_FILES = 100_000
 _STORAGE_MAX_DEPTH = 5
 
 
@@ -738,7 +737,6 @@ def get_storage_stats():
     folder_stats: list[dict] = []
     ext_stats = {"Image (JPG/PNG)": 0, "Video (MP4)": 0, "Khác": 0}
     ig_user_count, twitter_user_count = 0, 0
-    truncated = False
 
     try:
         entries = os.listdir(norm_root)
@@ -770,35 +768,18 @@ def get_storage_stats():
         
         all_folders_info.append({"name": folder, "folder_path": folder_path, "mtime": max_mtime, "size": 0, "count": 0})
 
-    # === PHASE 2: Xu ly files (co the bi truncated) ===
+    # === PHASE 2: Xu ly files ===
     for f_info in all_folders_info:
         folder = f_info["name"]
         folder_path = f_info["folder_path"]
         f_size, f_count, max_mtime = f_info["mtime"], 0, f_info["mtime"]
         
-        if truncated:
-            # Van append folder hien tai (voi count hien tai)
-            folder_stats.append({
-                "name": folder,
-                "size_mb": round(f_size / (1024 * 1024), 2),
-                "count": f_count,
-                "is_dir": True,
-                "mtime": max_mtime,
-            })
-            # Tiep tuc de append cac folders con lai (nhung khong dem them files)
-            continue  # Khong break - tiep tuc de append folders con lai
-        
         for root_dir, dirs, files in os.walk(folder_path):
-            if truncated:
-                break
             depth = root_dir[len(folder_path):].count(os.sep)
             if depth >= _STORAGE_MAX_DEPTH:
                 dirs[:] = []
                 continue
             for file in files:
-                if total_files >= _STORAGE_MAX_FILES:
-                    truncated = True
-                    break
                 f_count += 1
                 total_files += 1
                 ext = os.path.splitext(file)[1].lower()
@@ -818,8 +799,6 @@ def get_storage_stats():
                         max_mtime = fmtime
                 except OSError:
                     pass
-            if truncated:
-                break
         
         # Luon append folder_stats sau khi xu ly xong folder
         folder_stats.append({
@@ -840,7 +819,6 @@ def get_storage_stats():
         "twitter_user_count": twitter_user_count,
         "ext_stats": ext_stats,
         "all_folders": folder_stats,
-        "truncated": truncated,
     }
 
 
@@ -931,7 +909,7 @@ if __name__ == "__main__":
     try:
         uvicorn.run(
             "web_server:app",
-            host="127.0.0.1",
+            host="0.0.0.0",
             port=8000,
             log_level="warning",
             access_log=False,
