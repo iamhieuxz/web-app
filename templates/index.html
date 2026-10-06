@@ -281,17 +281,7 @@
         </div>
     </div>
     
-    <!-- Service Worker Registration -->
-    <script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/static/sw.js')
-                .then(reg => console.log('✅ SW registered:', reg.scope))
-                .catch(err => console.log('❌ SW registration failed:', err));
-        });
-    }
-    </script>
     
-    <script src="/static/js/app.js?v=20261007_0248"></script>
+    <script src="/static/js/app.js?v=20261007_0304"></script>
 </body>
 </html>
