@@ -41,7 +41,7 @@ function authFetch(url, options = {}) {
 // ============================================================
 // WebSocket Connection
 // ============================================================
-const ws = new WebSocket(`ws://${window.location.host}/ws/log?token=${encodeURIComponent(AUTH_TOKEN)}`);
+const ws = new WebSocket(`wss://${window.location.host}/ws/log?token=${encodeURIComponent(AUTH_TOKEN)}`);
 
 const colorMap = {
     'LOG_SYSTEM': 'text-sky-400',
