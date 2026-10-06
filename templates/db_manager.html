@@ -1,9 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Database & Storage Manager</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MediaStore">
+    <meta name="application-name" content="MediaStore">
+    <meta name="msapplication-TileColor" content="#09090b">
+    <meta name="theme-color" content="#0ea5e9">
+    
+    <!-- Icons -->
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-128.png">
+    
+    <!-- Manifest -->
+    <link rel="manifest" href="/static/manifest.json">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
@@ -152,6 +169,18 @@
             </div>
         </div>
     </div>
-    <script src="/static/db_manager.js?v=search_mode_v1"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/static/sw.js')
+                .then(reg => console.log('✅ SW registered:', reg.scope))
+                .catch(err => console.log('❌ SW registration failed:', err));
+        });
+    }
+    </script>
+    
+    <script src="/static/js/db_manager.js?v=20261007_0248"></script>
 </body>
 </html>

@@ -28,7 +28,7 @@ class Downloader:
         prefix: str = "",
         extra_args: list[str] | None = None,
     ) -> Iterator[str]:
-        cmd = ["gallery-dl", "--destination", os.path.abspath(dest)]
+        cmd = ["python", "-m", "gallery_dl", "--destination", os.path.abspath(dest)]
         archive_path = os.path.abspath(os.path.join(dest, ".instagram_archive.sqlite"))
         cmd.extend(["--download-archive", archive_path])
 
@@ -49,6 +49,11 @@ class Downloader:
         if extra_args:
             cmd.extend(extra_args)
 
+        # Các tham số chống Rate Limit (giống x_tool3.py)
+        cmd.extend(["--sleep-request", "3-10"])
+        cmd.extend(["--sleep", "1-5"])
+        cmd.extend(["-o", "cache.file=none"])
+
         cmd.append(url)
 
         try:
@@ -61,7 +66,7 @@ class Downloader:
     def execute_twitter_download(
         self, url: str, dest: str, cookie: str
     ) -> Iterator[str]:
-        cmd = ["gallery-dl", "--destination", os.path.abspath(dest)]
+        cmd = ["python", "-m", "gallery_dl", "--destination", os.path.abspath(dest)]
         archive_path = os.path.abspath(os.path.join(dest, ".twitter_archive.sqlite"))
         cmd.extend(["--download-archive", archive_path])
 
@@ -73,6 +78,11 @@ class Downloader:
             "{date:%Y-%m-%d}_{tweet_id|id}_{num:04d}.{extension}"
         )
         cmd.extend(["--filename", filename_template])
+
+        # Các tham số chống Rate Limit (giống tool cũ x_tool3.py)
+        cmd.extend(["--sleep-request", "3-10"])
+        cmd.extend(["--sleep", "1-5"])
+        cmd.extend(["-o", "cache.file=none"])
 
         cmd.append(url)
 

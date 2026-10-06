@@ -365,17 +365,52 @@ class InstagramService:
 
         if include_highlights:
             self.log("⭐ Lớp 3: Highlights...", "LOG_SYSTEM")
-            if "/stories/highlights/" in target:
+            # Kiểm tra URL: dạng /stories/highlights/<ID>/ là highlight cụ thể
+            # Ngược lại, scrape highlight IDs từ profile
+            if "/stories/highlights/" in target and not target.endswith("/highlights/"):
+                # URL cụ thể: https://www.instagram.com/stories/highlights/<HL_ID>/
+                hl_url = target.rstrip("/") + "/"
                 saw, had_error = self._consume_download(
-                    target, dest, limit_range=None,
+                    hl_url, dest, limit_range=None,
                     disable_range=disable_range, label="HIGHLIGHT", log_new_only=False,
                 )
             else:
-                saw, had_error = self._consume_download(
-                    target, dest, limit_range=None,
-                    disable_range=disable_range, label="HIGHLIGHT", log_new_only=False,
-                    extra_args=["-o", "include=highlights"],
-                )
+                # URL tổng hợp: https://www.instagram.com/{username}/highlights/
+                # Cần scrape để lấy từng highlight reel ID
+                hl_username = self._derive_destination_name(self._normalize_instagram_target(target))
+                self.log(f"   🔍 Đang tìm highlights của @{hl_username}...", "LOG_NORMAL")
+                
+                highlight_ids = self._get_highlight_ids_from_username(hl_username)
+                
+                if not highlight_ids:
+                    # Fallback: thử trực tiếp URL highlights
+                    self.log("   ⚠️ Không lấy được highlight IDs, thử URL trực tiếp...", "LOG_NORMAL")
+                    highlights_url = f"https://www.instagram.com/{hl_username}/highlights/"
+                    saw, had_error = self._consume_download(
+                        highlights_url, dest, limit_range=None,
+                        disable_range=disable_range, label="HIGHLIGHT", log_new_only=False,
+                    )
+                else:
+                    self.log(f"   📋 Tìm thấy {len(highlight_ids)} nhóm Highlight!", "LOG_NORMAL")
+                    any_saw = False
+                    any_error = False
+                    for idx, hl_id in enumerate(highlight_ids, start=1):
+                        if self.state.stop_requested:
+                            break
+                        hl_url = f"https://www.instagram.com/stories/highlights/{hl_id}/"
+                        self.log(f"   ⭐ [{idx}/{len(highlight_ids)}] Đang tải Highlight {hl_id}...", "LOG_NORMAL")
+                        saw, had_error = self._consume_download(
+                            hl_url, dest, limit_range=None,
+                            disable_range=disable_range, label="HIGHLIGHT", log_new_only=False,
+                        )
+                        any_saw = any_saw or saw
+                        any_error = any_error or had_error
+                        if idx < len(highlight_ids):
+                            self.rate_limit_guard.wait_after_account(
+                                stop_requested=lambda: self.state.stop_requested
+                            )
+                    saw, had_error = any_saw, any_error
+                    
             if not saw and not had_error and not self.state.stop_requested:
                 self.log(
                     "   ℹ️ Tài khoản không có Highlight hoặc đã đồng bộ đầy đủ.",
@@ -513,6 +548,86 @@ class InstagramService:
             f"https://www.instagram.com/stories/"
             f"{self._derive_destination_name(self._normalize_instagram_target(target))}"
         )
+
+    def _get_highlight_ids_from_username(self, username: str) -> list[str]:
+        """Scrape highlight IDs từ username bằng cách dùng gallery-dl với URL tổng hợp.
+        
+        Returns list of highlight IDs (reel IDs).
+        """
+        import json
+        import re
+        
+        cookie = self.app_config.cookie_path
+        cmd = [
+            "gallery-dl",
+            "--cookies", os.path.abspath(cookie) if cookie else "",
+            "--json",
+            f"https://www.instagram.com/{username}/highlights/"
+        ]
+        
+        # Filter out empty cookie arg if no cookie
+        cmd = [c for c in cmd if c]
+        
+        env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"
+        
+        si = None
+        if sys.platform == "win32":
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 1
+        
+        try:
+            proc = subprocess.run(
+                cmd,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
+                startupinfo=si,
+                env=env,
+            )
+            
+            # Parse JSON output từ gallery-dl
+            highlight_ids = []
+            for line in proc.stdout.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    # Tìm highlight reel ID trong JSON
+                    if isinstance(data, dict):
+                        # Kiểm tra various possible key names
+                        for key in ('id', 'highlightId', 'reel_id', 'highlight_id'):
+                            if key in data and isinstance(data[key], str):
+                                hl_id = data[key]
+                                if hl_id.isdigit() and len(hl_id) >= 15:
+                                    highlight_ids.append(hl_id)
+                except json.JSONDecodeError:
+                    continue
+            
+            # Fallback: parse từ text output nếu không có JSON
+            if not highlight_ids:
+                output = proc.stderr + proc.stdout
+                # Tìm patterns như: "highlight_reel_123456789012345"
+                matches = re.findall(r'highlight[_\s]reel[_\s]?(\d{15,20})', output, re.IGNORECASE)
+                highlight_ids.extend(matches)
+                
+                # Hoặc tìm URL patterns
+                url_matches = re.findall(r'highlights/(\d{15,20})', output)
+                highlight_ids.extend(url_matches)
+            
+            return list(set(highlight_ids))
+            
+        except subprocess.TimeoutExpired:
+            logger.warning("Timeout khi lấy highlight IDs cho %s", username)
+        except Exception as e:
+            logger.warning("Lỗi khi lấy highlight IDs cho %s: %s", username, e)
+        
+        return []
 
 
 # ==========================================

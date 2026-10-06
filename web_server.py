@@ -144,7 +144,7 @@ async def lifespan(app: FastAPI):
     server_loop = asyncio.get_running_loop()
 
     # Startup
-    logger.info("✅ Server đã khởi động trên http://127.0.0.1:8000")
+    logger.info("[START] Server đã khởi động trên http://127.0.0.1:8000")
     os.makedirs("templates", exist_ok=True)
     os.makedirs("static", exist_ok=True)
     os.makedirs(app_config.download_folder, exist_ok=True)
@@ -161,7 +161,7 @@ async def lifespan(app: FastAPI):
             x_executor.shutdown(wait=True, cancel_futures=False)
         except Exception:
             logger.exception("Lỗi trong quá trình shutdown")
-        logger.info("✅ Shutdown hoàn tất")
+        logger.info("[START] Shutdown hoàn tất")
 
 
 # ==========================================

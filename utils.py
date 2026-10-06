@@ -15,6 +15,9 @@ _USERNAME_PATTERN = re.compile(r"^(?!\.)(?!.*\.\.)(?!.*\.$)[A-Za-z0-9._-]{1,30}$
 
 def is_admin() -> bool:
     try:
+        import sys
+        if sys.platform != "win32":
+            return False
         return bool(ctypes.windll.shell32.IsUserAnAdmin())
     except Exception:
         return False
@@ -23,7 +26,9 @@ def is_admin() -> bool:
 def request_admin_privileges() -> None:
     if is_admin():
         return
-    ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+    import sys
+    if sys.platform == "win32":
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
     sys.exit()
 
 

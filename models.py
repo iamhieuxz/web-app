@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 @dataclass(slots=True)
 class AppConfig:
-    download_folder: str = os.path.normpath(r"E:\gallery-dl")
+    download_folder: str = "/data/downloads"
     cookie_path: str = ""
     backup_cookie_path: str = ""
     cookie_x_path: str = ""

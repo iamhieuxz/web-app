@@ -1,13 +1,28 @@
+/**
+ * Universal Downloader Web - Main Application
+ * Handles UI interactions, WebSocket logging, and API communication
+ */
+
+// ============================================================
+// DOM Elements & Global State
+// ============================================================
 const terminalIg = document.getElementById("terminal-ig");
 const terminalX = document.getElementById("terminal-x");
 const AUTH_TOKEN = window.AUTH_TOKEN || "";
 
-// Helper: fetch tự động gắn X-Auth-Token header
+// ============================================================
+// Authentication Helper
+// ============================================================
+/**
+ * Fetch wrapper that automatically includes auth token
+ * Handles common HTTP errors (401, 429) with user-friendly messages
+ */
 function authFetch(url, options = {}) {
     options.headers = options.headers || {};
     if (AUTH_TOKEN) {
         options.headers["X-Auth-Token"] = AUTH_TOKEN;
     }
+    
     return fetch(url, options).then(res => {
         if (res.status === 401) {
             addLog("🔒 Phiên làm việc đã hết hạn. Tải lại trang (F5).", "LOG_WARN", "ig");
@@ -23,7 +38,9 @@ function authFetch(url, options = {}) {
     });
 }
 
-// Kết nối WebSocket kèm token trong query string
+// ============================================================
+// WebSocket Connection
+// ============================================================
 const ws = new WebSocket(`ws://${window.location.host}/ws/log?token=${encodeURIComponent(AUTH_TOKEN)}`);
 
 const colorMap = {
@@ -36,6 +53,7 @@ const colorMap = {
 
 let activeTermTab = 'ig';
 let currentPlatform = 'ig';
+const VALID_TAGS = new Set(['LOG_SYSTEM', 'LOG_WARN', 'FILE_OLD', 'FILE_NEW', 'LOG_NORMAL']);
 
 ws.onmessage = function(event) {
     const data = JSON.parse(event.data);
@@ -47,13 +65,19 @@ ws.onerror = function() {
     addLog("⚠️ Mất kết nối tới Server. Hãy tải lại trang (F5).", "LOG_WARN", "x");
 };
 
-const VALID_TAGS = new Set(['LOG_SYSTEM', 'LOG_WARN', 'FILE_OLD', 'FILE_NEW', 'LOG_NORMAL']);
-
+// ============================================================
+// Logging Functions
+// ============================================================
+/**
+ * Add a log message to the terminal display
+ * @param {string} message - Log message content
+ * @param {string} tag - Log type (LOG_SYSTEM, LOG_WARN, FILE_OLD, FILE_NEW, LOG_NORMAL)
+ * @param {string} platform - Target platform ('ig' or 'x')
+ */
 function addLog(message, tag = "LOG_NORMAL", platform = "ig") {
     const targetTerm = platform === 'x' ? terminalX : terminalIg;
     if (!targetTerm) return;
 
-    // Sanitize: chỉ chấp nhận tag hợp lệ, message luôn qua textContent
     const safeTag = VALID_TAGS.has(tag) ? tag : 'LOG_NORMAL';
 
     const span = document.createElement("span");
@@ -61,14 +85,19 @@ function addLog(message, tag = "LOG_NORMAL", platform = "ig") {
     span.textContent = String(message ?? "");
     targetTerm.appendChild(span);
     
+    // Auto-scroll to bottom if viewing this platform's log
     if (activeTermTab === platform) {
         targetTerm.scrollTop = targetTerm.scrollHeight;
     } else {
+        // Show badge to indicate new logs
         const badge = document.getElementById(`badge-${platform}`);
         if (badge) badge.classList.remove('hidden');
     }
 }
 
+// ============================================================
+// Tab Switching Functions
+// ============================================================
 function switchTermTab(platform) {
     activeTermTab = platform;
     const btnIg = document.getElementById('termTabBtn-ig');
@@ -117,11 +146,21 @@ function switchTab(platform) {
     switchTermTab(platform);
 }
 
-// [MỚI]: Tự động nạp Cookie ngay khi người dùng chọn file
+// ============================================================
+// Cookie Management
+// ============================================================
+/**
+ * Auto-upload cookie file when user selects it
+ * @param {string} platform - Target platform ('ig' or 'x')
+ * @param {number} cookieNum - Cookie slot number (1 or 2)
+ * @param {HTMLElement} inputElement - File input element
+ */
 async function handleCookieSelect(platform, cookieNum, inputElement) {
     if (!inputElement.files || inputElement.files.length === 0) return;
+    
     const file = inputElement.files[0];
     const formData = new FormData();
+    
     if (platform === 'ig') {
         if (cookieNum === 1) formData.append("cookie1", file);
         else formData.append("cookie2", file);
@@ -129,8 +168,11 @@ async function handleCookieSelect(platform, cookieNum, inputElement) {
         formData.append("cookieX", file);
     }
 
-    const labelId = platform === 'ig' ? (cookieNum === 1 ? 'labelCookie1' : 'labelCookie2') : 'labelCookieX';
+    const labelId = platform === 'ig' 
+        ? (cookieNum === 1 ? 'labelCookie1' : 'labelCookie2') 
+        : 'labelCookieX';
     const labelEl = document.getElementById(labelId);
+    
     if (labelEl) {
         labelEl.textContent = `⏳ Đang nạp ${file.name}...`;
         labelEl.className = "text-sm text-amber-400 w-2/3 truncate font-bold";
@@ -147,6 +189,44 @@ async function handleCookieSelect(platform, cookieNum, inputElement) {
     }
 }
 
+/**
+ * Save cookies pasted from iPhone/Android
+ * @param {string} platform - Target platform
+ * @param {number} cookieNum - Cookie slot number
+ */
+async function savePastedCookie(platform, cookieNum) {
+    const textarea = document.getElementById('pasteCookie-' + platform);
+    if (!textarea || !textarea.value.trim()) {
+        alert('Vui lòng dán nội dung cookies trước!');
+        return;
+    }
+    
+    const blob = new Blob([textarea.value.trim()], { type: 'text/plain' });
+    const filename = `pasted_cookie_${Date.now()}.txt`;
+    const file = new File([blob], filename, { type: 'text/plain' });
+    
+    const formData = new FormData();
+    if (platform === 'ig') {
+        formData.append(cookieNum === 1 ? "cookie1" : "cookie2", file);
+    } else {
+        formData.append("cookieX", file);
+    }
+    
+    try {
+        const res = await authFetch('/api/config/upload-cookies', { method: 'POST', body: formData });
+        if (res.ok) {
+            await checkConfigStatus();
+            addLog(`✅ Đã lưu Cookie ${platform.toUpperCase()} #${cookieNum} từ paste!`, "FILE_NEW", platform);
+            textarea.value = '';
+        }
+    } catch(e) {
+        alert('Lỗi khi lưu cookies!');
+    }
+}
+
+/**
+ * Check and update cookie configuration status
+ */
 async function checkConfigStatus() {
     try {
         const res = await authFetch('/api/config/status');
@@ -164,9 +244,14 @@ async function checkConfigStatus() {
             document.getElementById("labelCookieX").textContent = "✅ Đang dùng Cookie X trong hệ thống.";
             document.getElementById("labelCookieX").className = "text-sm text-blue-400 w-2/3 truncate font-bold";
         }
-    } catch(e) { console.error("Chưa kết nối được Server."); }
+    } catch(e) { 
+        console.error("Chưa kết nối được Server."); 
+    }
 }
 
+// ============================================================
+// Input Mode Switching
+// ============================================================
 function toggleMode(platform) {
     const mode = document.querySelector(`input[name="mode${platform === 'ig' ? 'Ig' : 'X'}"]:checked`).value;
     document.getElementById(`singleInputBox-${platform}`).classList.toggle('hidden', mode !== 'single');
@@ -175,9 +260,13 @@ function toggleMode(platform) {
     saveInputState(platform);
 }
 
+/**
+ * Load list of targets from a .txt file
+ */
 function loadListFromFile(event, targetTextareaId, platform) {
     const file = event.target.files[0];
     if (!file) return;
+    
     const reader = new FileReader();
     reader.onload = function(e) {
         const textarea = document.getElementById(targetTextareaId);
@@ -190,7 +279,12 @@ function loadListFromFile(event, targetTextareaId, platform) {
     event.target.value = ""; 
 }
 
-// [MỚI]: Lưu trạng thái input vào LocalStorage chống mất dữ liệu khi F5
+// ============================================================
+// LocalStorage Persistence
+// ============================================================
+/**
+ * Save current input state to LocalStorage to prevent data loss on F5
+ */
 function saveInputState(platform) {
     const modeEl = document.querySelector(`input[name="mode${platform === 'ig' ? 'Ig' : 'X'}"]:checked`);
     if (!modeEl) return;
@@ -211,6 +305,9 @@ function saveInputState(platform) {
     }
 }
 
+/**
+ * Restore input state from LocalStorage on page load
+ */
 function restoreInputState() {
     ['ig', 'x'].forEach(platform => {
         const savedMode = localStorage.getItem(`mode_${platform}`);
@@ -232,27 +329,46 @@ function restoreInputState() {
     if (localStorage.getItem("chk_range") !== null) document.getElementById("chkDisableRange").checked = localStorage.getItem("chk_range") === "true";
 }
 
-// Cập nhật số lượng tài khoản Database hiển thị trên các thẻ radio
+// ============================================================
+// Database Account Counts
+// ============================================================
+/**
+ * Update the account count displayed on Database radio buttons
+ */
 async function updateDbCounts() {
     try {
         const res = await authFetch('/api/db/accounts');
         const accounts = await res.json();
         if (Array.isArray(accounts)) {
-            const igCount = accounts.filter(a => a.platform === 'instagram' && a.is_active === 1).length;
-            const xCount = accounts.filter(a => a.platform === 'twitter' && a.is_active === 1).length;
+            const igCount = accounts.filter(a => 
+                (a.platform === 'instagram' || a.platform === 1) && 
+                (a.is_active === 1 || a.is_active === '1' || a.is_active == null)
+            ).length;
+            const xCount = accounts.filter(a => 
+                (a.platform === 'twitter' || a.platform === 2) && 
+                (a.is_active === 1 || a.is_active === '1' || a.is_active == null)
+            ).length;
             document.getElementById("countDb-ig").textContent = igCount;
             document.getElementById("countDb-x").textContent = xCount;
         }
     } catch(e) { console.error("Lỗi đếm DB accounts:", e); }
 }
 
-// [MỚI]: Hàm thực thi lệnh thông minh
+// ============================================================
+// Job Execution
+// ============================================================
+/**
+ * Execute download/update job for specified platform
+ * @param {string} platform - Target platform ('ig' or 'x')
+ * @param {string} action - Job type ('new', 'update', 'sync_all', 'livestream')
+ */
 async function runJob(platform, action) {
     const targetTerm = platform === 'x' ? terminalX : terminalIg;
     targetTerm.innerHTML = "";
     switchTermTab(platform);
     addLog(`⏳ Đang khởi động Engine ${platform.toUpperCase()}...`, "LOG_SYSTEM", platform);
 
+    // Special handling for livestream
     if (action === 'livestream') {
         const liveTarget = document.getElementById("liveTarget-x").value.trim();
         if (!liveTarget) {
@@ -267,12 +383,13 @@ async function runJob(platform, action) {
         return;
     }
 
+    // Sync all accounts from database
     if (action === 'sync_all') {
         await authFetch(`/api/${platform}/sync/local`, { method: 'POST' });
         return;
     }
 
-    const mode = document.querySelector(`input[name="mode${platform === 'ig' ? 'Ig' : 'X'}"]:checked`).value;
+    const mode = document.querySelector(`input[name="mode${platform === 'ig' ? 'Ig' : 'X'}]:checked`).value;
     const payload = {
         disable_range: platform === 'ig' ? document.getElementById("chkDisableRange").checked : true,
         include_posts: platform === 'ig' ? document.getElementById("chkPost").checked : true,
@@ -283,17 +400,16 @@ async function runJob(platform, action) {
 
     let endpoint = "";
 
-    // 1. Chế độ dùng Database
+    // Mode 1: Use Database
     if (mode === 'db') {
         endpoint = action === 'new' ? `/api/${platform}/download/list` : `/api/${platform}/update/list`;
-        payload.targets = []; // Để trống để Backend tự lấy từ database
+        payload.targets = [];
         addLog(`🗄️ Đang lấy danh sách tài khoản từ Database...`, "LOG_SYSTEM", platform);
     } 
-    // 2. Chế độ 1 Target
+    // Mode 2: Single Target
     else if (mode === 'single') {
         const singleVal = document.getElementById(`singleTarget-${platform}`).value.trim();
         if (!singleVal) {
-            // Tự động chuyển sang Database nếu ô trống khi cập nhật
             if (action === 'update') {
                 addLog("ℹ️ Ô nhập liệu trống. Hệ thống tự động chuyển sang cập nhật tài khoản từ Database!", "LOG_WARN", platform);
                 endpoint = `/api/${platform}/update/list`;
@@ -307,7 +423,7 @@ async function runJob(platform, action) {
             endpoint = action === 'new' ? `/api/${platform}/download/single` : `/api/${platform}/update/single`;
         }
     } 
-    // 3. Chế độ Nhập List
+    // Mode 3: List of Targets
     else {
         const rawList = document.getElementById(`listTargets-${platform}`).value;
         const targets = rawList.split('\n').map(s => s.trim()).filter(s => s !== "");
@@ -342,6 +458,9 @@ async function runJob(platform, action) {
     }
 }
 
+/**
+ * Stop running job for specified platform
+ */
 async function runStop(platform) {
     addLog(`🛑 Đang gửi lệnh dừng cho ${platform.toUpperCase()}...`, "LOG_WARN", platform);
     try { 
@@ -352,6 +471,9 @@ async function runStop(platform) {
     }
 }
 
+// ============================================================
+// Initialization
+// ============================================================
 window.onload = async function() {
     await checkConfigStatus();
     await updateDbCounts();

@@ -1,9 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Universal Downloader Web</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MediaStore">
+    <meta name="application-name" content="MediaStore">
+    <meta name="msapplication-TileColor" content="#09090b">
+    <meta name="theme-color" content="#0ea5e9">
+    
+    <!-- Icons -->
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-128.png">
+    
+    <!-- Manifest -->
+    <link rel="manifest" href="/static/manifest.json">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -77,6 +94,15 @@
                                     <input type="file" id="fileCookie2" class="hidden" accept=".txt" onchange="handleCookieSelect('ig', 2, this)">
                                 </label>
                                 <span id="labelCookie2" class="text-sm text-zinc-500 italic w-2/3 truncate">Chưa chọn file (Dự phòng)...</span>
+                            </div>
+                            <!-- Paste Cookies từ iPhone -->
+                            <div class="mt-3 pt-3 border-t border-zinc-700">
+                                <label class="text-xs text-zinc-400 block mb-2">📱 Hoặc dán cookies trực tiếp (cho iPhone):</label>
+                                <textarea id="pasteCookie-ig" rows="3" placeholder="Dán nội dung cookies vào đây..." class="custom-scroll w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-xs text-zinc-100 focus:border-pink-500 outline-none resize-y font-mono shadow-inner"></textarea>
+                                <div class="flex gap-2 mt-2">
+                                    <button onclick="savePastedCookie('ig', 1)" class="text-xs bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded font-bold transition">💾 Lưu Cookie 1</button>
+                                    <button onclick="savePastedCookie('ig', 2)" class="text-xs bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded font-bold transition">💾 Lưu Cookie 2</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -254,6 +280,18 @@
             </div>
         </div>
     </div>
-    <script src="/static/app.js?v=20261004_v5"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/static/sw.js')
+                .then(reg => console.log('✅ SW registered:', reg.scope))
+                .catch(err => console.log('❌ SW registration failed:', err));
+        });
+    }
+    </script>
+    
+    <script src="/static/js/app.js?v=20261007_0248"></script>
 </body>
 </html>
