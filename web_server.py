@@ -217,7 +217,7 @@ def _check_endpoint_throttle(request: Request) -> None:
 # ==========================================
 utils.cleanup_temp_cookies()
 database.init_db()
-logger.info("🔐 Auth token (8 ký tự đầu): %s...", auth.AUTH_TOKEN[:8])
+logger.info("[AUTH] Auth token (8 ky tu dau): %s...", auth.AUTH_TOKEN[:8])
 
 saved_root = database.get_setting("download_folder", "/data/downloads")
 
