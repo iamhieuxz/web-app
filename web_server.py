@@ -904,15 +904,16 @@ def delete_item(req: FileRequest, request: Request):
 # 17. KHỞI ĐỘNG SERVER
 # ==========================================
 if __name__ == "__main__":
-    logger.info("🚀 Khởi chạy Web Server tại: http://127.0.0.1:8000")
-    logger.info("🔐 Auth token đầy đủ: %s", auth.AUTH_TOKEN)
+    PORT = int(os.environ.get("PORT", 8000))
+    logger.info("Starting Web Server on 0.0.0.0:%d", PORT)
+    logger.info("Auth token: %s", auth.AUTH_TOKEN[:8])
     try:
         uvicorn.run(
             "web_server:app",
             host="0.0.0.0",
-            port=8000,
+            port=PORT,
             log_level="warning",
             access_log=False,
         )
     except KeyboardInterrupt:
-        logger.info("Server bị ngắt bởi người dùng (Ctrl+C)")
+        logger.info("Server interrupted")
